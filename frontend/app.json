@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "Zippy",
+    "slug": "zippy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#07070F"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.zippy.app",
+      "config": {
+        "googleMapsApiKey": "AIzaSyBQCkhpgOQPEFr2198W6u7xC2BxNjxk0A0"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Zippy uses your location to show your position on the map and find nearby drivers.",
+        "NSLocationAlwaysUsageDescription": "Zippy uses your location to track your ride in real time."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#07070F"
+      },
+      "package": "com.zippy.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyBQCkhpgOQPEFr2198W6u7xC2BxNjxk0A0"
+        }
+      },
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Zippy uses your location to show your position on the map and connect you with nearby drivers.",
+          "locationAlwaysPermission": "Zippy uses your location to track your ride in real-time even when the app is in the background."
+        }
+      ]
+    ]
+  }
+}

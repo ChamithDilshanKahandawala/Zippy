@@ -14,6 +14,11 @@ export interface UserDocument {
   phoneNumber: string;
   role: UserRole;
   isVerified: boolean; // false until admin approves (drivers especially)
+  profilePicUrl?: string;
+  rating?: number;
+  emergencyContact?: string;
+  homeAddress?: string;
+  workAddress?: string;
   createdAt: FirebaseFirestore.Timestamp;
 }
 

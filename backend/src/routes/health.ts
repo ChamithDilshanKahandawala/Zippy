@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { healthCheck } from '../controllers/healthController';
+import { getHealth } from '../controllers/healthController';
 
 const router = Router();
 
 /**
  * @route  GET /api/health
- * @desc   Health check — confirms backend + Firebase are live
+ * @desc   Check backend + Firebase connection status
  * @access Public
  */
-router.get('/', healthCheck);
+router.get('/', getHealth);
 
 export default router;

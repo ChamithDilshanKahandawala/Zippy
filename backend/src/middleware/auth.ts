@@ -2,90 +2,86 @@ import { Request, Response, NextFunction } from 'express';
 import { auth, db } from '../config/firebase';
 import { UserRole } from '../types/user';
 
-// ─── Augment Express Request with verified user data ─────────────────────────
+// ─── Extend Express Request type to include user ────────────────
 declare global {
   namespace Express {
     interface Request {
       user?: {
         uid: string;
         email: string;
-        role: UserRole;
       };
+      userRole?: UserRole;
     }
   }
 }
 
 /**
- * verifyToken
- * -----------
- * Extracts the Bearer token from the Authorization header,
- * verifies it against Firebase Auth, and attaches the decoded
- * user payload to req.user.
+ * Middleware: Verify Firebase ID Token
+ * Extracts token from Authorization header and verifies it
  */
-export const verifyToken = async (
+export const verifyIdToken = async (
   req: Request,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): Promise<void> => {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ success: false, error: 'Missing or invalid Authorization header.' });
-    return;
-  }
-
-  const idToken = authHeader.split('Bearer ')[1];
-
   try {
-    const decoded = await auth.verifyIdToken(idToken);
-
-    // Fetch the user's role from Firestore (source of truth for roles)
-    const userSnap = await db.collection('users').doc(decoded.uid).get();
-
-    if (!userSnap.exists) {
-      res.status(401).json({ success: false, error: 'User profile not found. Please register first.' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ success: false, error: 'No authorization token provided' });
       return;
     }
 
-    const userData = userSnap.data()!;
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await auth.verifyIdToken(token);
 
     req.user = {
-      uid: decoded.uid,
-      email: decoded.email ?? '',
-      role: userData.role as UserRole,
+      uid: decodedToken.uid,
+      email: decodedToken.email || '',
     };
 
     next();
-  } catch (err) {
-    console.error('⚠️ Token verification failed:', err);
-    res.status(401).json({ success: false, error: 'Invalid or expired token.' });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      error: 'Authentication failed: Invalid or expired token',
+    });
   }
 };
 
 /**
- * checkRole(allowedRoles)
- * -----------------------
- * Role-guard middleware factory. Runs AFTER verifyToken.
- * Rejects the request if req.user.role is not in the allowedRoles list.
- *
- * Usage:
- *   router.get('/admin/dashboard', verifyToken, checkRole(['admin']), handler)
+ * Middleware: Verify User Role
+ * Checks Firestore user document to verify role
+ * Must be called AFTER verifyIdToken
  */
-export const checkRole = (allowedRoles: UserRole[]) => {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ success: false, error: 'Not authenticated.' });
-      return;
-    }
+export const verifyRole = (allowedRoles: UserRole[]) => {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, error: 'User not authenticated' });
+        return;
+      }
 
-    if (!allowedRoles.includes(req.user.role)) {
-      res.status(403).json({
-        success: false,
-        error: `Access denied. Required role: [${allowedRoles.join(', ')}]. Your role: ${req.user.role}.`,
-      });
-      return;
-    }
+      // Get user document from Firestore (source of truth for roles)
+      const userDoc = await db.collection('users').doc(req.user.uid).get();
+      const userData = userDoc.data();
 
-    next();
+      if (!userData || !userDoc.exists) {
+        res.status(404).json({ success: false, error: 'User profile not found' });
+        return;
+      }
+
+      if (!allowedRoles.includes(userData.role as UserRole)) {
+        res.status(403).json({
+          success: false,
+          error: `Access denied. Required roles: ${allowedRoles.join(', ')}`,
+        });
+        return;
+      }
+
+      req.userRole = userData.role as UserRole;
+      next();
+    } catch (error) {
+      res.status(500).json({ success: false, error: 'Role verification failed' });
+    }
   };
 };

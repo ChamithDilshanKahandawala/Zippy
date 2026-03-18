@@ -9,6 +9,16 @@ export interface UserProfile {
   phoneNumber: string;
   role: UserRole;
   isVerified: boolean;
+  profilePicUrl?: string;
+  rating?: number;
+  emergencyContact?: string;
+  homeAddress?: string;
+  workAddress?: string;
+  createdAt: { _seconds: number; _nanoseconds: number };
+  currentLocation?: { latitude: number; longitude: number };
+  notificationsEnabled?: boolean;
+  pushToken?: string;
+  walletBalance?: number; // Primary wallet balance
 }
 
 export interface RegisterPayload {
@@ -24,6 +34,15 @@ export interface ApiResponse<T = undefined> {
   message?: string;
   error?: string;
   user?: T;
+}
+
+export interface HealthCheckResponse {
+  success: boolean;
+  status: string;
+  message: string;
+  firebase: string;
+  timestamp: string;
+  environment: string;
 }
 
 export { FirebaseError };

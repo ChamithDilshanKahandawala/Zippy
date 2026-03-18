@@ -2,9 +2,10 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import {
   initializeAuth,
   getAuth,
-  getReactNativePersistence,
   Auth,
 } from 'firebase/auth';
+// @ts-ignore - Some versions of firebase SDK have different export paths for react-native persistence
+import { getReactNativePersistence } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -33,6 +34,11 @@ try {
   auth = getAuth(app);
 }
 
+import { getStorage, FirebaseStorage } from 'firebase/storage';
+
+// ... existing code ...
+
 export { auth };
 export const db: Firestore = getFirestore(app);
+export const storage: FirebaseStorage = getStorage(app);
 export default app;

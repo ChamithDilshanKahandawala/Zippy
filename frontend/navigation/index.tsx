@@ -4,13 +4,17 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View, ActivityIndicator } from 'react-native';
 
 import { useUser } from '../context/UserContext';
+import NotificationHandler from '../components/NotificationHandler';
 
 // ─── Screens ─────────────────────────────────────────────────────────────────
 import RegisterScreen from '../screens/RegisterScreen';
 import SignInScreen   from '../screens/SignInScreen';
-import RiderHomeScreen      from '../screens/rider/HomeScreen';
+import RiderHomeScreen      from '../screens/user/HomeScreen';
 import DriverHomeScreen     from '../screens/driver/HomeScreen';
 import AdminDashboardScreen from '../screens/admin/DashboardScreen';
+import ProfileScreen        from '../screens/ProfileScreen';
+import PaymentScreen        from '../screens/PaymentScreen';
+import ChatScreen           from '../screens/ChatScreen';
 
 // ─── Param lists ─────────────────────────────────────────────────────────────
 type AuthStackParams = {
@@ -21,6 +25,9 @@ type AppStackParams = {
   RiderHome: undefined;
   DriverHome: undefined;
   AdminDashboard: undefined;
+  Profile: undefined;
+  Payment: undefined;
+  Chat: { rideId: string; recipientName: string; recipientId: string; recipientPhone?: string };
 };
 
 const AuthStack = createNativeStackNavigator<AuthStackParams>();
@@ -79,6 +86,21 @@ function AppNavigator() {
       {user?.role === 'admin' && (
         <AppStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       )}
+      <AppStack.Screen 
+        name="Profile" 
+        component={ProfileScreen} 
+        options={{ animation: 'slide_from_right' }}
+      />
+      <AppStack.Screen 
+        name="Payment" 
+        component={PaymentScreen} 
+        options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+      />
+      <AppStack.Screen 
+        name="Chat" 
+        component={ChatScreen} 
+        options={{ animation: 'slide_from_right' }}
+      />
     </AppStack.Navigator>
   );
 }
@@ -91,7 +113,14 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {user ? <AppNavigator /> : <AuthNavigator />}
+      {user ? (
+        <>
+          <AppNavigator />
+          <NotificationHandler />
+        </>
+      ) : (
+        <AuthNavigator />
+      )}
     </NavigationContainer>
   );
 }

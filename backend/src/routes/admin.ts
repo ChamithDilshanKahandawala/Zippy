@@ -1,24 +1,41 @@
 import { Router } from 'express';
-import { getDashboard, getStats } from '../controllers/adminController';
-import { verifyToken, checkRole } from '../middleware/auth';
+import {
+  getDashboard,
+  getStats,
+  getPendingDrivers,
+  approveDriver,
+  rejectDriver,
+} from '../controllers/adminController';
+import { verifyIdToken, verifyRole } from '../middleware/auth';
 
 const router = Router();
 
-// Both routes below require a valid token AND the 'admin' role.
-// A 'rider' or 'driver' token will receive a 403 Forbidden response.
+// Middleware to protect all routes in this router
+router.use(verifyIdToken, verifyRole(['admin']));
 
 /**
- * @route  GET /admin/dashboard
- * @desc   Admin-only dashboard entry
- * @access Private — admin
+ * @route  GET /api/admin/dashboard
  */
-router.get('/dashboard', verifyToken, checkRole(['admin']), getDashboard);
+router.get('/dashboard', getDashboard);
 
 /**
- * @route  GET /admin/stats
- * @desc   Live user count breakdown by role
- * @access Private — admin
+ * @route  GET /api/admin/stats
  */
-router.get('/stats', verifyToken, checkRole(['admin']), getStats);
+router.get('/stats', getStats);
+
+/**
+ * @route  GET /api/admin/drivers/pending
+ */
+router.get('/drivers/pending', getPendingDrivers);
+
+/**
+ * @route  POST /api/admin/drivers/:driverId/approve
+ */
+router.post('/drivers/:driverId/approve', approveDriver);
+
+/**
+ * @route  POST /api/admin/drivers/:driverId/reject
+ */
+router.post('/drivers/:driverId/reject', rejectDriver);
 
 export default router;

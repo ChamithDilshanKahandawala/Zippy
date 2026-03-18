@@ -65,3 +65,21 @@ export const getAdminStats = (idToken: string) =>
   apiFetch('/api/admin/stats', {
     headers: { Authorization: `Bearer ${idToken}` },
   });
+
+// ─── Payment ──────────────────────────────────────────────────────────────────
+export const initiatePayment = (amount: number, idToken: string) =>
+  apiFetch<{ data: { clientSecret: string; transactionId: string } }>(
+    '/api/payment/initiate',
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ amount }),
+    },
+  );
+
+export const verifyPaymentWebhook = (payload: any) =>
+  apiFetch('/api/payment/verify', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+

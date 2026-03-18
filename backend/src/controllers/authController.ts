@@ -70,6 +70,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     phoneNumber: phoneNumber.trim(),
     role,
     isVerified: role === 'user', // users are auto-verified; drivers need admin approval
+    rating: 5.0,
+    emergencyContact: '',
     createdAt: admin.firestore.Timestamp.now(),
   };
 

@@ -2,10 +2,8 @@ import { Request, Response } from 'express';
 import { db } from '../config/firebase';
 
 /**
- * GET /admin/dashboard
- * --------------------
+ * GET /api/admin/dashboard
  * Returns admin-level summary data.
- * Protected by verifyToken + checkRole(['admin']).
  */
 export const getDashboard = async (_req: Request, res: Response): Promise<void> => {
   res.status(200).json({
@@ -18,35 +16,122 @@ export const getDashboard = async (_req: Request, res: Response): Promise<void> 
 };
 
 /**
- * GET /admin/stats
- * ----------------
- * Returns live user counts broken down by role from Firestore.
- * Protected by verifyToken + checkRole(['admin']).
+ * GET /api/admin/stats
+ * Returns platform statistics (requires admin role)
  */
-export const getStats = async (_req: Request, res: Response): Promise<void> => {
+export const getStats = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Count users by role
     const usersSnap = await db.collection('users').get();
+    const users = usersSnap.docs.map((doc) => doc.data());
 
-    const counts = { user: 0, driver: 0, admin: 0, total: 0 };
+    const stats = {
+      totalUsers: users.length,
+      totalRiders: users.filter((u) => u.role === 'user').length,
+      totalDrivers: users.filter((u) => u.role === 'driver').length,
+      verifiedDrivers: users.filter((u) => u.role === 'driver' && u.isVerified).length,
+      pendingDrivers: users.filter((u) => u.role === 'driver' && !u.isVerified).length,
+    };
 
-    usersSnap.forEach((doc) => {
-      const role = doc.data().role as keyof typeof counts;
-      if (role in counts) counts[role]++;
-      counts.total++;
+    res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch stats',
+    });
+  }
+};
+
+/**
+ * GET /api/admin/drivers/pending
+ * Returns list of drivers awaiting verification
+ */
+export const getPendingDrivers = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const driversSnap = await db
+      .collection('users')
+      .where('role', '==', 'driver')
+      .where('isVerified', '==', false)
+      .get();
+
+    const pendingDrivers = driversSnap.docs.map((doc) => ({
+      uid: doc.id,
+      ...doc.data(),
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: pendingDrivers,
+      count: pendingDrivers.length,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch pending drivers',
+    });
+  }
+};
+
+/**
+ * POST /api/admin/drivers/:driverId/approve
+ * Approve a pending driver
+ */
+export const approveDriver = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+
+    if (!driverId) {
+      res.status(400).json({ success: false, error: 'Driver ID required' });
+      return;
+    }
+
+    // Update driver's isVerified status
+    await db.collection('users').doc(driverId).update({
+      isVerified: true,
+      approvedAt: new Date(),
     });
 
     res.status(200).json({
       success: true,
-      stats: {
-        totalUsers: counts.total,
-        users: counts.user,
-        drivers: counts.driver,
-        admins: counts.admin,
-        generatedAt: new Date().toISOString(),
-      },
+      message: `Driver ${driverId} approved`,
     });
-  } catch (err) {
-    console.error('❌ Failed to fetch admin stats:', err);
-    res.status(500).json({ success: false, error: 'Failed to fetch stats.' });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to approve driver',
+    });
+  }
+};
+
+/**
+ * POST /api/admin/drivers/:driverId/reject
+ * Reject a pending driver
+ */
+export const rejectDriver = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+    const { reason } = req.body;
+
+    if (!driverId) {
+      res.status(400).json({ success: false, error: 'Driver ID required' });
+      return;
+    }
+
+    // Delete or mark as rejected
+    await db.collection('users').doc(driverId).delete();
+
+    res.status(200).json({
+      success: true,
+      message: `Driver ${driverId} rejected`,
+      reason,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to reject driver',
+    });
   }
 };

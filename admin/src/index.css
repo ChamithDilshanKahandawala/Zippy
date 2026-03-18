@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply antialiased bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+

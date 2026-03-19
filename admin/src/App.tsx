@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminLayout } from './layouts/AdminLayout';
 import { OverviewPage } from './pages/OverviewPage';
 import { DriversPage } from './pages/DriversPage';
+import { PendingRidersPage } from './pages/PendingRidersPage';
 import { RidersPage } from './pages/RidersPage';
 import { ActiveRidesPage } from './pages/ActiveRidesPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -38,11 +39,12 @@ const AppRoutes: React.FC = () => {
         }
       >
         <Route index element={<Navigate to="overview" replace />} />
-        <Route path="overview" element={<OverviewPage />} />
-        <Route path="drivers" element={<DriversPage />} />
-        <Route path="riders" element={<RidersPage />} />
-        <Route path="active-rides" element={<ActiveRidesPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="overview"       element={<OverviewPage />}      />
+        <Route path="drivers"        element={<DriversPage />}       />
+        <Route path="pending-riders" element={<PendingRidersPage />} />
+        <Route path="riders"         element={<RidersPage />}        />
+        <Route path="active-rides"   element={<ActiveRidesPage />}   />
+        <Route path="settings"       element={<SettingsPage />}      />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

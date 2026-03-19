@@ -42,8 +42,11 @@ export const sendPushNotification = async (
       body: body,
       data: data,
       badge: 1, // Increment app badge
-      _displayInForeground: true,
+      // Note: _displayInForeground was removed in newer expo-server-sdk versions.
+      // Foreground notification display is now handled client-side via
+      // expo-notifications' setNotificationHandler in the mobile app.
     }];
+
 
     // 3. Send via Expo
     const chunks = expo.chunkPushNotifications(messages);

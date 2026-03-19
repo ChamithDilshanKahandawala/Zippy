@@ -1,0 +1,114 @@
+rules_version = '2';
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  Zippy — Firestore Security Rules
+//  Last updated: 2026-03-19
+// ══════════════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    /** Returns true when the request comes from an authenticated user. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** Returns true when the requester is the owner of the document. */
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    /** Returns the requesting user's role from Firestore (cached in auth token). */
+    function callerRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    /** Returns true when the calling user is an admin. */
+    function isAdmin() {
+      return callerRole() == 'admin';
+    }
+
+    /** Returns true when the calling user is the rider OR driver of a given ride. */
+    function isRideParticipant(rideData) {
+      return request.auth.uid == rideData.riderId
+          || request.auth.uid == rideData.driverId;
+    }
+
+    // ── /users/{uid} ──────────────────────────────────────────────────────────
+    //
+    //  • Any signed-in user can read their own document (for profile screen).
+    //  • Admins can read any user document (for the dashboard rider list).
+    //  • create is disabled here — user creation is performed server-side via
+    //    the Firebase Admin SDK (backend authController), which bypasses rules.
+    //  • A user can update their own doc ONLY for safe fields (name, phone, etc.)
+    //    They CANNOT change role, isVerified, or riderDetails.rejectionReason.
+    //  • Admins can update anything (used by RiderReviewModal approve/reject).
+    //
+    match /users/{uid} {
+      allow read: if isSignedIn() && (isOwner(uid) || isAdmin());
+
+      // User creation via Admin SDK — no client-side creates allowed.
+      allow create: if false;
+
+      allow update: if isSignedIn() && (
+        // Admin: unrestricted update (approve / reject riders, etc.)
+        isAdmin()
+        ||
+        // Owner: cannot touch role, isVerified, or rejection fields
+        (
+          isOwner(uid) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'role',
+            'isVerified',
+            'riderDetails.rejectionReason',
+          ])
+        )
+      );
+
+      allow delete: if false;
+    }
+
+    // ── /rides/{rideId} ───────────────────────────────────────────────────────
+    //
+    //  • Rider or driver of a ride can read it; so can admins.
+    //  • Only the authenticated rider can CREATE a ride (no impersonation).
+    //  • Either party on the ride, or an admin, can update.
+    //
+    match /rides/{rideId} {
+      allow read: if isSignedIn() && (
+        isRideParticipant(resource.data) || isAdmin()
+      );
+
+      allow create: if isSignedIn()
+        && request.resource.data.riderId == request.auth.uid;
+
+      allow update: if isSignedIn() && (
+        isRideParticipant(resource.data) || isAdmin()
+      );
+
+      allow delete: if false;
+
+      // ── /rides/{rideId}/messages/{msgId} ────────────────────────────────────
+      // Both ride participants can read and write messages.
+      match /messages/{msgId} {
+        allow read, write: if isSignedIn()
+          && isRideParticipant(get(/databases/$(database)/documents/rides/$(rideId)).data);
+      }
+    }
+
+    // ── /notifications/{notifId} ──────────────────────────────────────────────
+    // Users can read notifications addressed to them. Admins can write them.
+    match /notifications/{notifId} {
+      allow read: if isSignedIn()
+        && resource.data.recipientUid == request.auth.uid;
+      allow write: if isAdmin();
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

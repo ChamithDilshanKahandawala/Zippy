@@ -1,27 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Car, MapPinned, Settings, LogOut, Zap } from 'lucide-react';
+import {
+  LayoutDashboard, Users, Car, MapPinned, Settings,
+  LogOut, Zap, Clock
+} from 'lucide-react';
 import { useAuth } from '../modules/auth/AuthContext';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebase';
-
-const navItems = [
-  { to: '/admin/overview',     label: 'Overview',     icon: LayoutDashboard },
-  { to: '/admin/drivers',      label: 'Drivers',      icon: Car             },
-  { to: '/admin/riders',       label: 'Riders',       icon: Users           },
-  { to: '/admin/active-rides', label: 'Active Rides', icon: MapPinned       },
-  { to: '/admin/settings',     label: 'Settings',     icon: Settings        },
-];
+import { auth, db } from '../firebase';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 export const AdminLayout: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Real-time pending rider count for badge
+  useEffect(() => {
+    const q = query(
+      collection(db, 'users'),
+      where('role', '==', 'driver'),
+      where('isVerified', '==', false),
+    );
+    return onSnapshot(q, (snap) => setPendingCount(snap.size));
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/login', { replace: true });
   };
+
+  const navItems = [
+    { to: '/admin/overview',          label: 'Overview',          icon: LayoutDashboard, badge: 0             },
+    { to: '/admin/drivers',           label: 'Drivers',           icon: Car,             badge: 0             },
+    { to: '/admin/pending-riders',    label: 'Pending Riders',    icon: Clock,           badge: pendingCount  },
+    { to: '/admin/riders',            label: 'Passengers',        icon: Users,           badge: 0             },
+    { to: '/admin/active-rides',      label: 'Active Rides',      icon: MapPinned,       badge: 0             },
+    { to: '/admin/settings',          label: 'Settings',          icon: Settings,        badge: 0             },
+  ];
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -50,21 +66,28 @@ export const AdminLayout: React.FC = () => {
                 to={item.to}
                 end={item.to === '/admin/overview'}
                 className={({ isActive }) =>
-                  `flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  `flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
                     isActive
                       ? 'bg-zippy-blue text-white shadow-sm shadow-zippy-blue/40'
                       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                   }`
                 }
               >
-                <Icon className="w-4 h-4 shrink-0" />
-                {item.label}
+                <span className="flex items-center gap-2.5">
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {item.label}
+                </span>
+                {item.badge > 0 && (
+                  <span className="ml-auto min-w-[1.25rem] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </NavLink>
             );
           })}
         </nav>
 
-        {/* Sidebar Footer — user info + logout */}
+        {/* Footer */}
         <div className="px-4 py-4 border-t border-slate-200 dark:border-slate-800 space-y-2">
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-zippy-blue/10 dark:bg-zippy-blue/20 flex items-center justify-center shrink-0">
@@ -76,12 +99,9 @@ export const AdminLayout: React.FC = () => {
               <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">
                 {profile?.fullName || profile?.email || 'Admin'}
               </p>
-              <p className="text-[10px] uppercase tracking-wide text-zippy-blue font-medium">
-                Administrator
-              </p>
+              <p className="text-[10px] uppercase tracking-wide text-zippy-blue font-medium">Administrator</p>
             </div>
           </div>
-
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 transition-all duration-150"
@@ -92,11 +112,17 @@ export const AdminLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* ── Main Content ─────────────────────────────────────────── */}
+      {/* ── Main Content ───────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0">
         <header className="h-14 shrink-0 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm transition-colors duration-300">
           <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">Dashboard</div>
           <div className="flex items-center gap-3">
+            {pendingCount > 0 && (
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 px-2.5 py-1 rounded-full">
+                <Clock className="w-3 h-3" />
+                {pendingCount} rider{pendingCount > 1 ? 's' : ''} pending review
+              </div>
+            )}
             <span className="text-xs text-slate-400 hidden sm:block">
               {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
             </span>

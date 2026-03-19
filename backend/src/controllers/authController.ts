@@ -75,6 +75,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     createdAt: admin.firestore.Timestamp.now(),
   };
 
+  // Drivers: initialize riderDetails stub so the admin review modal always
+  // finds the expected Firestore shape even before the driver uploads docs.
+  if (role === 'driver') {
+    userDoc.riderDetails = {
+      vehicleModel: '',
+      vehiclePlate: '',
+      vehicleType: '',
+      isOnline: false,
+      documents: {
+        nicUrl: '',
+        licenseUrl: '',
+        insuranceUrl: '',
+      },
+      rejectionReason: '',
+    };
+  }
+
+
   try {
     await db.collection('users').doc(userRecord.uid).set(userDoc);
   } catch (firestoreErr) {

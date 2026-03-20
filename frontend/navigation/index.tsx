@@ -7,8 +7,9 @@ import { useUser } from '../context/UserContext';
 import NotificationHandler from '../components/NotificationHandler';
 
 // ─── Screens ─────────────────────────────────────────────────────────────────
-import RegisterScreen from '../screens/RegisterScreen';
-import SignInScreen   from '../screens/SignInScreen';
+import RegisterScreen       from '../screens/RegisterScreen';
+import SignInScreen         from '../screens/SignInScreen';
+import PendingApprovalScreen from '../screens/PendingApprovalScreen';
 import RiderHomeScreen      from '../screens/user/HomeScreen';
 import DriverHomeScreen     from '../screens/driver/HomeScreen';
 import AdminDashboardScreen from '../screens/admin/DashboardScreen';
@@ -22,6 +23,7 @@ type AuthStackParams = {
   Register: undefined;
 };
 type AppStackParams = {
+  PendingApproval: undefined;
   RiderHome: undefined;
   DriverHome: undefined;
   AdminDashboard: undefined;
@@ -42,8 +44,7 @@ function LoadingScreen() {
   );
 }
 
-// ─── Unauthenticated stack ─────────────────────────────────────────────────────
-// Default screen: SignIn  |  Register reachable via "Create one" link
+// ─── Unauthenticated stack ────────────────────────────────────────────────────
 function AuthNavigator() {
   return (
     <AuthStack.Navigator
@@ -70,35 +71,48 @@ function AuthNavigator() {
   );
 }
 
-// ─── Authenticated stack — role gated ────────────────────────────────────────
-// RootNavigator only renders AppNavigator when user is set, so role is always defined here.
+// ─── Authenticated stack — role + verification gated ─────────────────────────
 function AppNavigator() {
   const { user } = useUser();
 
   return (
     <AppStack.Navigator screenOptions={{ headerShown: false }}>
+      {/* ── Passenger ── */}
       {user?.role === 'user' && (
         <AppStack.Screen name="RiderHome" component={RiderHomeScreen} />
       )}
-      {user?.role === 'driver' && (
+
+      {/* ── Driver: gate on isVerified ────────────────────────────────────────
+            When isVerified is false (pending or rejected), show the holding screen.
+            UserContext uses onSnapshot so this switches to DriverHome the instant
+            the admin toggles isVerified → true — no restart needed.
+      ────────────────────────────────────────────────────────────────────────── */}
+      {user?.role === 'driver' && !user?.isVerified && (
+        <AppStack.Screen name="PendingApproval" component={PendingApprovalScreen} />
+      )}
+      {user?.role === 'driver' && user?.isVerified && (
         <AppStack.Screen name="DriverHome" component={DriverHomeScreen} />
       )}
+
+      {/* ── Admin ── */}
       {user?.role === 'admin' && (
         <AppStack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
       )}
-      <AppStack.Screen 
-        name="Profile" 
-        component={ProfileScreen} 
+
+      {/* ── Shared screens (accessible from any role) ── */}
+      <AppStack.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{ animation: 'slide_from_right' }}
       />
-      <AppStack.Screen 
-        name="Payment" 
-        component={PaymentScreen} 
+      <AppStack.Screen
+        name="Payment"
+        component={PaymentScreen}
         options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
       />
-      <AppStack.Screen 
-        name="Chat" 
-        component={ChatScreen} 
+      <AppStack.Screen
+        name="Chat"
+        component={ChatScreen}
         options={{ animation: 'slide_from_right' }}
       />
     </AppStack.Navigator>

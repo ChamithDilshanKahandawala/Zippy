@@ -3,12 +3,15 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, StyleSheet, Image, Li
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../../config/firebase';
 import { useUser } from '../../context/UserContext';
 import { startLocationTracking, stopLocationTracking } from '../../services/locationTask';
 import { socketService } from '../../services/socket';
 import { checkForActiveDriverRide } from '../../services/rideService';
 import { useRideStatus } from '../../hooks/useRideStatus';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
+import { RideRequestModal } from './RideRequestModal';
 
 // LinearGradient: use style prop directly — avoids cssInterop interference
 // Switch: NativeWind wraps it via cssInterop which conflicts with its native boolean props
@@ -38,6 +41,19 @@ export default function DriverHomeScreen({ navigation }: any) {
 
   const toggleOnline = async (value: boolean) => {
     setIsOnline(value);
+
+    // Persist isOnline to Firestore so admin + passenger app can see
+    if (user?.uid) {
+      try {
+        await setDoc(doc(db, 'users', user.uid), {
+          isOnline: value,
+          'riderDetails.isOnline': value,
+        }, { merge: true });
+      } catch (e) {
+        console.error('❌ Failed to update isOnline:', e);
+      }
+    }
+
     if (value) {
       socketService.connect();
       await startLocationTracking(user?.uid || 'default-driver');
@@ -45,6 +61,7 @@ export default function DriverHomeScreen({ navigation }: any) {
       await stopLocationTracking();
     }
   };
+
 
   const handleChat = () => {
     if (ride && ride.riderId) {
@@ -186,6 +203,16 @@ export default function DriverHomeScreen({ navigation }: any) {
           </View>
         </View>
       </ScrollView>
+
+      {/* ── Slide-up Ride Request Modal ── */}
+      {isOnline && !activeRideId && (
+        <RideRequestModal 
+          onRideAccepted={(id) => {
+            setActiveRideId(id);
+            // Could navigate to a specific ride view if desired
+          }} 
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../config/firebase'; 
 import { RideStatus } from '../types/ride';
+import { dispatchRide } from './api';
 
 // ── Create a new Ride request ──────────────────────────────────────────────
 export const createRide = async (
@@ -41,6 +42,14 @@ export const createRide = async (
     };
 
     const docRef = await addDoc(ridesRef, ridePayload);
+
+    // Call backend to start matching loop
+    try {
+      await dispatchRide(docRef.id);
+    } catch (dispatchErr) {
+      console.error('Matching trigger failed, but ride was created:', dispatchErr);
+    }
+
     return docRef.id;
   } catch (error: any) {
     console.error('Error creating ride request:', error.message);

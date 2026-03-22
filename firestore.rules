@@ -106,6 +106,15 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── /active_drivers/{uid} ─────────────────────────────────────────────────
+    // Passengers read nearby drivers (geo-queries). Drivers write their own loc.
+    // Admins read all for the fleet dashboard.
+    match /active_drivers/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isOwner(uid);
+      allow delete: if isSignedIn() && (isOwner(uid) || isAdmin());
+    }
+
     // ── Deny everything else ──────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;

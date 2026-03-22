@@ -83,3 +83,24 @@ export const verifyPaymentWebhook = (payload: any) =>
     body: JSON.stringify(payload),
   });
 
+// ─── Ride Matching ────────────────────────────────────────────────────────────
+export const dispatchRide = (rideId: string) =>
+  apiFetch('/api/ride/dispatch', {
+    method: 'POST',
+    body: JSON.stringify({ rideId }),
+  });
+
+export const acceptRideRequest = (rideId: string, driverId: string, idToken: string) =>
+  apiFetch(`/api/ride/${rideId}/accept`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ driverId }),
+  });
+
+export const declineRideRequest = (rideId: string, driverId: string, idToken: string) =>
+  apiFetch(`/api/ride/${rideId}/decline`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ driverId }),
+  });
+

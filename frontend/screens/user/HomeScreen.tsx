@@ -18,6 +18,7 @@ import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useUser } from '../../context/UserContext';
 import { useDriverTracking } from '../../hooks/useDriverTracking';
+import { useNearbyDrivers } from '../../hooks/useNearbyDrivers';
 import { RideWorkflowContainer } from '../../components/ride/RideWorkflowContainer';
 import { createRide, checkForActiveRide } from '../../services/rideService';
 
@@ -64,6 +65,9 @@ export default function RiderHomeScreen({ navigation }: any) {
   // ── Driver Tracking State ────────────────────────────────────────────────────
   const [driverId, setDriverId] = useState<string | null>(null);
   const { driverLocation, isDriverArrived } = useDriverTracking(driverId, origin);
+
+  // ── Nearby Drivers (shown on map when not riding) ──────────────────────────
+  const { drivers: nearbyDrivers } = useNearbyDrivers(origin, 5);
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [searching, setSearching] = useState(false);
@@ -282,6 +286,21 @@ export default function RiderHomeScreen({ navigation }: any) {
             </Marker>
           )}
 
+          {/* ── Nearby driver markers (when no ride in progress) ── */}
+          {!destination && !currentRideId && nearbyDrivers.map((d) => (
+            <Marker
+              key={d.uid}
+              coordinate={{ latitude: d.latitude, longitude: d.longitude }}
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat
+              rotation={d.heading}
+            >
+              <View style={styles.nearbyDriverMarker}>
+                <Text style={{ fontSize: 20 }}>🚗</Text>
+              </View>
+            </Marker>
+          ))}
+
           {destination && <Marker coordinate={destination} pinColor="#EF4444" />}
 
           {driverLocation && driverAnimatedRegion && (
@@ -414,6 +433,7 @@ const styles = StyleSheet.create({
   originDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#3B82F6', borderWidth: 3, borderColor: '#fff' },
   originDotInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', alignSelf: 'center', marginTop: 4 },
   driverMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', borderWidth: 2, borderColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
+  nearbyDriverMarker: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1.5, borderColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
   myLocationBtn: { position: 'absolute', right: 16, width: 50, height: 50, borderRadius: 25, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   myLocationBtnDefault: { bottom: 40 },
   myLocationBtnAbovePanel: { bottom: 340 },

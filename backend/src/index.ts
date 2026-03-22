@@ -18,6 +18,7 @@ import authRouter from './routes/auth';
 import adminRouter from './routes/admin';
 import userRouter from './routes/user';
 import paymentRouter from './routes/payment';
+import rideRouter from './routes/ride';
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 import { errorHandler } from './middleware/errorHandler';
@@ -55,6 +56,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/user', userRouter);
 app.use('/api/v1/user', userRouter); // PRD v1.3 specific support
 app.use('/api/payment', paymentRouter);
+app.use('/api/ride', rideRouter);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 app.use((_req: Request, res: Response) => {

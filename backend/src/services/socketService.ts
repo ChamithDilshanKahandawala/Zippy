@@ -9,6 +9,7 @@ export const initSocket = (server: HttpServer) => {
     },
   });
 
+  (global as any).__zippy_io = io;
   console.log('🔌 Socket.io initialized');
 
   io.on('connection', (socket: Socket) => {

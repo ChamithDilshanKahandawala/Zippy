@@ -12,6 +12,7 @@ export interface NearbyDriver {
   heading: number;
   speed: number;
   distanceKm: number;
+  vehicleType: string;
 }
 
 /**
@@ -30,6 +31,7 @@ export interface NearbyDriver {
 export const useNearbyDrivers = (
   center: { latitude: number; longitude: number } | null,
   radiusKm: number = 5,
+  vehicleFilter: string | null = null,
 ) => {
   const [drivers, setDrivers] = useState<NearbyDriver[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,22 +52,32 @@ export const useNearbyDrivers = (
 
     const unsubscribes = bounds.map(([start, end]) => {
       const q = query(
-        collection(db, 'active_drivers'),
-        orderBy('g'),
-        // Firestore range filter: g >= start AND g <= end
-        // We use orderBy + startAt/endAt via the query constraints
+        collection(db, 'active_riders'),
+        // We use orderBy + startAt/endAt via the query constraints inside the map loop below 
+        // because compound queries with range filters in firebase need careful typing, 
+        // we'll just filter manually in memory for now because geohash bounds are small.
       );
 
       // For geohash range queries we use the raw onSnapshot and filter
       return onSnapshot(q, (snap) => {
         snap.docs.forEach((docSnap) => {
           const data = docSnap.data();
-          const g = data.g as string;
+          const g = data.location?.geohash as string | undefined;
+
+          // Check if driver is available and matches filter
+          if (data.status !== 'available') {
+             allResults.delete(docSnap.id);
+             return;
+          }
+          if (vehicleFilter && data.vehicleType !== vehicleFilter) {
+             allResults.delete(docSnap.id);
+             return;
+          }
 
           // Check geohash is within our bounds
-          if (g >= start && g <= end) {
-            const lat = data.l?.lat ?? 0;
-            const lng = data.l?.lng ?? 0;
+          if (g && g >= start && g <= end) {
+            const lat = data.location?.lat ?? 0;
+            const lng = data.location?.lng ?? 0;
             const distKm = distanceBetween(
               [lat, lng],
               [center.latitude, center.longitude],
@@ -80,6 +92,7 @@ export const useNearbyDrivers = (
                 heading: data.heading ?? 0,
                 speed: data.speed ?? 0,
                 distanceKm: distKm,
+                vehicleType: data.vehicleType ?? 'tuk',
               });
             } else {
               allResults.delete(docSnap.id);
@@ -95,7 +108,7 @@ export const useNearbyDrivers = (
     });
 
     return () => unsubscribes.forEach((unsub) => unsub());
-  }, [center?.latitude, center?.longitude, radiusKm]);
+  }, [center?.latitude, center?.longitude, radiusKm, vehicleFilter]);
 
   return { drivers, loading };
 };

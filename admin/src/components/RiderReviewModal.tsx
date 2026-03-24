@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import {
   X, CheckCircle, XCircle, FileText, Car,
   User, Phone, Mail, ShieldCheck, ShieldX, Clock, ExternalLink
@@ -60,6 +61,23 @@ export const RiderReviewModal: React.FC<RiderReviewModalProps> = ({ open, onClos
 
   const rd = rider.riderDetails;
 
+  const notifyBackend = async (status: 'approved' | 'rejected', reason?: string) => {
+    try {
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/admin/drivers/${rider.id}/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ status, reason })
+      });
+    } catch (e) {
+      console.error("Backend notification failed", e);
+    }
+  };
+
   const handleApprove = async () => {
     setLoading('approve');
     try {
@@ -67,6 +85,7 @@ export const RiderReviewModal: React.FC<RiderReviewModalProps> = ({ open, onClos
         isVerified: true,
         'riderDetails.rejectionReason': '',
       });
+      await notifyBackend('approved');
       setActionDone('approved');
       setTimeout(() => { setActionDone(null); onClose(); }, 1200);
     } finally {
@@ -82,6 +101,7 @@ export const RiderReviewModal: React.FC<RiderReviewModalProps> = ({ open, onClos
         isVerified: false,
         'riderDetails.rejectionReason': rejectReason.trim(),
       });
+      await notifyBackend('rejected', rejectReason.trim());
       setActionDone('rejected');
       setTimeout(() => { setActionDone(null); setShowRejectForm(false); setRejectReason(''); onClose(); }, 1200);
     } finally {

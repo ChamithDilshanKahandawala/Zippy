@@ -14,7 +14,7 @@ interface NearbyDriver {
 
 /**
  * Find nearby online drivers sorted by distance.
- * Uses geohash range queries on the active_drivers collection.
+ * Uses geohash range queries on the active_riders collection.
  */
 async function findNearbyDrivers(
   lat: number,
@@ -26,9 +26,11 @@ async function findNearbyDrivers(
   const results: NearbyDriver[] = [];
 
   for (const [start, end] of bounds) {
+    // Only query drivers who are 'available'
     const snap = await db
-      .collection('active_drivers')
-      .orderBy('g')
+      .collection('active_riders')
+      .where('status', '==', 'available')
+      .orderBy('location.geohash')
       .startAt(start)
       .endAt(end)
       .get();
@@ -37,8 +39,8 @@ async function findNearbyDrivers(
       if (excludeUids.includes(doc.id)) continue;
 
       const data = doc.data();
-      const dLat = data.l?.lat ?? 0;
-      const dLng = data.l?.lng ?? 0;
+      const dLat = data.location?.lat ?? 0;
+      const dLng = data.location?.lng ?? 0;
       const distKm = distanceBetween([dLat, dLng], [lat, lng]);
 
       if (distKm <= radiusM / 1000) {

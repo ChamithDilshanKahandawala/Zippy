@@ -12,6 +12,8 @@ import { checkForActiveDriverRide } from '../../services/rideService';
 import { useRideStatus } from '../../hooks/useRideStatus';
 import { useUnreadMessages } from '../../hooks/useUnreadMessages';
 import { RideRequestModal } from './RideRequestModal';
+import { updateRideStatus, completeRide, rateRide } from '../../services/api';
+import { auth } from '../../config/firebase';
 
 // LinearGradient: use style prop directly — avoids cssInterop interference
 // Switch: NativeWind wraps it via cssInterop which conflicts with its native boolean props
@@ -26,20 +28,39 @@ export default function DriverHomeScreen({ navigation }: any) {
   const { ride } = useRideStatus(activeRideId);
   const unreadCount = useUnreadMessages(activeRideId);
 
+  // Loading state for ride action buttons
+  const [actionLoading, setActionLoading] = useState(false);
+  
+  // Rating Modal State
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [rating, setRating] = useState(5);
+
   useEffect(() => {
     const checkRide = async () => {
       if (user?.uid) {
         const id = await checkForActiveDriverRide(user.uid);
         if (id) setActiveRideId(id);
+        
+        // If there's a ride but it's completed and we haven't rated, show modal
+        if (ride?.status === 'COMPLETED' && !ride?.ratingByRider) {
+          setShowRatingModal(true);
+        } else if (ride?.status === 'COMPLETED' && ride?.ratingByRider) {
+          setActiveRideId(null);
+        }
       }
     };
     checkRide();
-    // Poll every 10s to be safe or rely on socket/notification
     const interval = setInterval(checkRide, 10000);
     return () => clearInterval(interval);
   }, [user]);
 
   const toggleOnline = async (value: boolean) => {
+    // Session Locking: only allow if verified
+    if (value && user?.isVerified !== true) {
+      alert('Your account is pending verification. You cannot go online yet.');
+      return;
+    }
+
     setIsOnline(value);
 
     // Persist isOnline to Firestore so admin + passenger app can see
@@ -56,7 +77,9 @@ export default function DriverHomeScreen({ navigation }: any) {
 
     if (value) {
       socketService.connect();
-      await startLocationTracking(user?.uid || 'default-driver');
+      // Pass the vehicle type so the map knows what to show
+      const vehicleType = user?.riderDetails?.vehicleType || 'tuk';
+      await startLocationTracking(user?.uid || 'default-driver', vehicleType);
     } else {
       await stopLocationTracking();
     }
@@ -80,6 +103,39 @@ export default function DriverHomeScreen({ navigation }: any) {
       // For now, assume it's not available in this minimal implementation
   };
 
+  const handleRideAction = async (newStatus: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED') => {
+    if (!ride || !user) return;
+    setActionLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken() || '';
+      if (newStatus === 'COMPLETED') {
+         await completeRide(ride.id, user.uid, ride.estimatedFare, token);
+         setShowRatingModal(true);
+      } else {
+         await updateRideStatus(ride.id, user.uid, newStatus, token);
+      }
+    } catch (e: any) {
+      alert(e.message || 'Action failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const submitRating = async () => {
+    if (!ride || !user) return;
+    setActionLoading(true);
+    try {
+      const token = await auth.currentUser?.getIdToken() || '';
+      await rateRide(ride.id, ride.riderId, rating, false, token);
+      setShowRatingModal(false);
+      setActiveRideId(null); // Clear active ride
+    } catch (e: any) {
+      alert('Failed to submit rating: ' + e.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-zippy-bg">
       <ScrollView
@@ -99,31 +155,52 @@ export default function DriverHomeScreen({ navigation }: any) {
         </View>
 
         {/* ── Active Ride Banner ── */}
-        {ride && (
+        {ride && ride.status !== 'COMPLETED' && (
           <View className="bg-zippy-accent/10 border border-zippy-accent rounded-xl p-4 mb-6">
             <View className="flex-row justify-between items-center mb-2">
                <Text className="text-zippy-accent font-bold uppercase text-xs">Current Ride</Text>
                <Text className="text-white font-bold">{ride.status}</Text>
             </View>
-            <Text className="text-white text-lg font-bold mb-4">Rider Waiting</Text>
+            <Text className="text-white text-lg font-bold mb-4">
+               {ride.status === 'ACCEPTED' ? 'Pick up Rider' : ride.status === 'ARRIVED' ? 'Rider Waiting' : 'Trip in Progress'}
+            </Text>
             
             <View className="flex-row gap-3">
                <TouchableOpacity 
                  onPress={handleChat}
-                 className="flex-1 bg-zippy-accent p-3 rounded-lg flex-row justify-center items-center relative"
+                 className="flex-1 bg-zippy-card border border-zippy-card p-3 rounded-lg flex-row justify-center items-center relative"
                >
                  <Ionicons name="chatbubble-ellipses" size={18} color="white" style={{ marginRight: 8 }} />
                  <Text className="text-white font-bold">Chat</Text>
-                 {unreadCount > 0 && (
-                   <View className="absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center border border-zippy-bg">
-                     <Text className="text-white text-[10px] font-bold">{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                   </View>
-                 )}
                </TouchableOpacity>
-               {/* Call Button (Disabled if no phone) */}
-               {/* <TouchableOpacity className="bg-green-600 p-3 rounded-lg justify-center items-center">
-                 <Feather name="phone" size={18} color="white" />
-               </TouchableOpacity> */}
+               
+               {ride.status === 'ACCEPTED' && (
+                 <TouchableOpacity 
+                   onPress={() => handleRideAction('ARRIVED')}
+                   disabled={actionLoading}
+                   className="flex-2 bg-zippy-accent p-3 rounded-lg justify-center items-center"
+                 >
+                   <Text className="text-white font-bold">{actionLoading ? '...' : 'Mark Arrived'}</Text>
+                 </TouchableOpacity>
+               )}
+               {ride.status === 'ARRIVED' && (
+                 <TouchableOpacity 
+                   onPress={() => handleRideAction('IN_PROGRESS')}
+                   disabled={actionLoading}
+                   className="flex-2 bg-[#10B981] p-3 rounded-lg justify-center items-center"
+                 >
+                   <Text className="text-white font-bold">{actionLoading ? '...' : 'Start Trip'}</Text>
+                 </TouchableOpacity>
+               )}
+               {ride.status === 'IN_PROGRESS' && (
+                 <TouchableOpacity 
+                   onPress={() => handleRideAction('COMPLETED')}
+                   disabled={actionLoading}
+                   className="flex-2 bg-[#EF4444] p-3 rounded-lg justify-center items-center"
+                 >
+                   <Text className="text-white font-bold">{actionLoading ? '...' : 'Complete Trip'}</Text>
+                 </TouchableOpacity>
+               )}
             </View>
           </View>
         )}
@@ -212,6 +289,35 @@ export default function DriverHomeScreen({ navigation }: any) {
             // Could navigate to a specific ride view if desired
           }} 
         />
+      )}
+      {/* ── Driver Rating Modal ── */}
+      {showRatingModal && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 100 }]}>
+          <View style={{ backgroundColor: '#191924', padding: 24, borderRadius: 16, width: '85%', alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 20, fontWeight: 'bold', marginBottom: 16 }}>Rate the Passenger</Text>
+            <Text style={{ color: '#94A3B8', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>
+              How was your trip with the passenger?
+            </Text>
+            
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 30 }}>
+              {[1, 2, 3, 4, 5].map((s) => (
+                <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                  <Ionicons name={s <= rating ? "star" : "star-outline"} size={36} color="#F59E0B" />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity 
+              onPress={submitRating}
+              disabled={actionLoading}
+              style={{ backgroundColor: '#7C3AED', width: '100%', padding: 16, borderRadius: 12, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>
+                {actionLoading ? 'Submitting...' : 'Submit Rating'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );

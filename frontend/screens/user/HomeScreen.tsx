@@ -66,8 +66,9 @@ export default function RiderHomeScreen({ navigation }: any) {
   const [driverId, setDriverId] = useState<string | null>(null);
   const { driverLocation, isDriverArrived } = useDriverTracking(driverId, origin);
 
-  // ── Nearby Drivers (shown on map when not riding) ──────────────────────────
-  const { drivers: nearbyDrivers } = useNearbyDrivers(origin, 5);
+  // ── Nearby Drivers Filtering ─────────────────────────────────────────────────
+  const [vehicleFilter, setVehicleFilter] = useState<string | null>(null); // null = all
+  const { drivers: nearbyDrivers } = useNearbyDrivers(origin, 5, vehicleFilter);
 
   // ── UI state ─────────────────────────────────────────────────────────────────
   const [searching, setSearching] = useState(false);
@@ -280,9 +281,13 @@ export default function RiderHomeScreen({ navigation }: any) {
           showsMyLocationButton={false}
           onMapReady={() => setMapReady(true)}
         >
-          {origin && (
-            <Marker key="origin" coordinate={origin} anchor={{ x: 0.5, y: 0.5 }}>
-              <View style={styles.originDot}><View style={styles.originDotInner} /></View>
+          {/* ── Start Location Pulse ── */}
+          {origin && !destination && !currentRideId && (
+            <Marker coordinate={origin} flat>
+              <View className="items-center justify-center">
+                <View className="w-[18px] h-[18px] bg-zippy-blue rounded-full border-[3px] border-white shadow-md z-10" />
+                <View className="absolute w-[40px] h-[40px] bg-zippy-blue/20 rounded-full animate-pulse z-0" />
+              </View>
             </Marker>
           )}
 
@@ -296,7 +301,10 @@ export default function RiderHomeScreen({ navigation }: any) {
               rotation={d.heading}
             >
               <View style={styles.nearbyDriverMarker}>
-                <Text style={{ fontSize: 20 }}>🚗</Text>
+                <Text style={{ fontSize: 16 }}>{
+                  d.vehicleType === 'luxury' ? '🚙' :
+                  d.vehicleType === 'budget' ? '🚗' : '🛺'
+                }</Text>
               </View>
             </Marker>
           ))}
@@ -339,8 +347,34 @@ export default function RiderHomeScreen({ navigation }: any) {
               <Text style={styles.avatarText}>{user?.fullName?.charAt(0).toUpperCase() ?? 'U'}</Text>
             </TouchableOpacity>
           </View>
-        )}
+      )}
 
+      {/* ── Vehicle Filter Chips (Shown when no destination and no active ride) ── */}
+      {!destination && !currentRideId && (
+        <View style={styles.filterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
+            {[{id: null, label: 'All'}, {id: 'tuk', label: 'Tuk-Tuk'}, {id: 'budget', label: 'Budget'}, {id: 'luxury', label: 'Luxury'}].map((filter) => (
+              <TouchableOpacity
+                key={filter.id ?? 'all'}
+                onPress={() => setVehicleFilter(filter.id)}
+                style={[
+                  styles.filterChip,
+                  vehicleFilter === filter.id && styles.filterChipActive
+                ]}
+              >
+                <Text style={[
+                  styles.filterText,
+                  vehicleFilter === filter.id && styles.filterTextActive
+                ]}>
+                  {filter.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* ── Where to Search Box ── */}
         {searching ? (
           <View style={styles.searchContainer}>
             <GooglePlacesAutocomplete
@@ -433,7 +467,52 @@ const styles = StyleSheet.create({
   originDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#3B82F6', borderWidth: 3, borderColor: '#fff' },
   originDotInner: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff', alignSelf: 'center', marginTop: 4 },
   driverMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', borderWidth: 2, borderColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
-  nearbyDriverMarker: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(124,58,237,0.15)', borderWidth: 1.5, borderColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
+  nearbyDriverMarker: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  filterContainer: {
+    position: 'absolute',
+    top: 130, // Just below the search bar
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  filterChip: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterChipActive: {
+    backgroundColor: '#7C3AED',
+    borderColor: '#7C3AED',
+  },
+  filterText: {
+    color: '#64748B',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  filterTextActive: {
+    color: '#fff',
+  },
   myLocationBtn: { position: 'absolute', right: 16, width: 50, height: 50, borderRadius: 25, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   myLocationBtnDefault: { bottom: 40 },
   myLocationBtnAbovePanel: { bottom: 340 },

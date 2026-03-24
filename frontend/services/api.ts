@@ -104,3 +104,24 @@ export const declineRideRequest = (rideId: string, driverId: string, idToken: st
     body: JSON.stringify({ driverId }),
   });
 
+export const updateRideStatus = (rideId: string, driverId: string, status: string, idToken: string) =>
+  apiFetch(`/api/ride/${rideId}/status`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ driverId, status }),
+  });
+
+export const completeRide = (rideId: string, driverId: string, finalFare: number, idToken: string) =>
+  apiFetch(`/api/ride/${rideId}/complete`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ driverId, finalFare }),
+  });
+
+export const rateRide = (rideId: string, targetId: string, rating: number, isPassengerRatingDriver: boolean, idToken: string) =>
+  apiFetch(`/api/ride/${rideId}/rate`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ targetId, rating, isPassengerRatingDriver }),
+  });
+

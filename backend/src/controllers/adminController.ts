@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { db } from '../config/firebase';
+import { sendPushNotification } from '../services/notificationService';
 
 /**
  * GET /api/admin/dashboard
@@ -133,5 +134,41 @@ export const rejectDriver = async (req: Request, res: Response): Promise<void> =
       success: false,
       error: 'Failed to reject driver',
     });
+  }
+};
+
+/**
+ * POST /api/admin/drivers/:driverId/notify
+ * Send an ad-hoc push notification for verification status (Approved/Rejected)
+ */
+export const notifyDriver = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { driverId } = req.params;
+    const { status, reason } = req.body;
+
+    if (!driverId || !status) {
+      res.status(400).json({ success: false, error: 'Driver ID and status required' });
+      return;
+    }
+
+    if (status === 'approved') {
+      await sendPushNotification(
+        driverId,
+        'Congratulations! 🎉',
+        'Your Zippy driver account has been approved. You can now go online and accept rides.',
+        { type: 'ACCOUNT_APPROVED' }
+      );
+    } else if (status === 'rejected') {
+      await sendPushNotification(
+        driverId,
+        'Account Update ⚠️',
+        `Your driver application needs attention. Reason: ${reason || 'Please check your app.'}`,
+        { type: 'ACCOUNT_REJECTED' }
+      );
+    }
+
+    res.status(200).json({ success: true, message: 'Notification sent' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to notify driver' });
   }
 };

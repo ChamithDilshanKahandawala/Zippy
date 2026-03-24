@@ -19,6 +19,12 @@ export interface UserProfile {
   notificationsEnabled?: boolean;
   pushToken?: string;
   walletBalance?: number; // Primary wallet balance
+  riderDetails?: {
+    vehicleType?: string;
+    vehicleModel?: string;
+    vehiclePlate?: string;
+    isOnline?: boolean;
+  };
 }
 
 export interface RegisterPayload {

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ProgressBarAndroid, ActivityIndicator } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Ride } from '../../types/ride';
+import { rateRide } from '../../services/api';
+import { auth } from '../../config/firebase';
 
 interface PaymentSummaryViewProps {
   ride: Ride;
@@ -10,9 +12,18 @@ interface PaymentSummaryViewProps {
 
 export const PaymentSummaryView = ({ ride, onClose }: PaymentSummaryViewProps) => { // Removed React.FC for now
   const [rating, setRating] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const handleSubmitRating = async () => {
-    // In real app, update driver rating in user doc
+    if (rating > 0 && ride.driverId) {
+      setLoading(true);
+      try {
+        const token = await auth.currentUser?.getIdToken() || '';
+        await rateRide(ride.id, ride.driverId, rating, true, token);
+      } catch (e: any) {
+        alert('Failed to submit rating: ' + (e.message || 'Unknown error'));
+      }
+    }
     onClose();
   };
 
@@ -44,9 +55,10 @@ export const PaymentSummaryView = ({ ride, onClose }: PaymentSummaryViewProps) =
 
       <TouchableOpacity 
         onPress={handleSubmitRating}
-        className="w-full bg-zippy-accent py-4 rounded-xl items-center shadow-lg shadow-purple-900/40"
+        disabled={loading}
+        className="w-full bg-zippy-accent py-4 rounded-xl items-center shadow-lg shadow-purple-900/40 opacity-90"
       >
-        <Text className="text-white text-lg font-bold">Done</Text>
+        <Text className="text-white text-lg font-bold">{loading ? 'Submitting...' : 'Done'}</Text>
       </TouchableOpacity>
     </View>
   );

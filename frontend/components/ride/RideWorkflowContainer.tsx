@@ -63,21 +63,23 @@ export const RideWorkflowContainer = ({ rideId, onRideCompleted, onRideCancelled
 
   switch (ride.status) {
     case 'PENDING':
+    case 'SEARCHING':
       return <SearchingDriverView rideId={ride.id} onCancel={handleCancel} />;
       
     case 'ACCEPTED':
-      // Driver is on the way
+    case 'ARRIVED':
+      // Driver is on the way or arrived
       if (!ride.driver) return <SearchingDriverView rideId={ride.id} onCancel={handleCancel} />; // Fallback
       return (
         <DriverAssignedView
           rideId={ride.id} 
           driver={ride.driver} 
-          estimatedTime="5 min"
+          estimatedTime={ride.status === 'ARRIVED' ? 'Arrived!' : 'On the way'}
           onCancel={handleCancel}
         />
       );
       
-    case 'STARTED':
+    case 'IN_PROGRESS':
       // Ride is in progress
       return <OngoingRideView ride={ride} />;
       

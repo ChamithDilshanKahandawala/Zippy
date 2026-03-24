@@ -18,6 +18,7 @@ interface OnlineDriver {
   longitude: number;
   heading: number;
   speed: number;
+  status: 'available' | 'busy';
   lastUpdated: any;
 }
 
@@ -42,6 +43,18 @@ const darkMapStyle = [
   { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
 ];
 
+// ── Status SVG Icon generator ──────────────────────────────────────────────────
+const createMarkerIcon = (emoji: string, status: string) => {
+  const bgColor = status === 'available' ? '#10B981' : '#F59E0B'; // Green for available, Orange for busy
+  const svg = `
+    <svg width="42" height="42" viewBox="0 0 42 42" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="21" cy="21" r="18" fill="${bgColor}" stroke="#ffffff" stroke-width="3"/>
+      <text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-size="18">${emoji}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
 // ── Component ────────────────────────────────────────────────────────────────
 export const AdminLiveMap: React.FC = () => {
   const [drivers, setDrivers]       = useState<OnlineDriver[]>([]);
@@ -53,9 +66,9 @@ export const AdminLiveMap: React.FC = () => {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string,
   });
 
-  // ── Real-time listener on active_drivers collection ─────────────────────
+  // ── Real-time listener on active_riders collection ─────────────────────
   useEffect(() => {
-    const q = collection(db, 'active_drivers');
+    const q = collection(db, 'active_riders');
 
     const unsub = onSnapshot(
       q,
@@ -81,13 +94,14 @@ export const AdminLiveMap: React.FC = () => {
             email: profile.email ?? '',
             phoneNumber: profile.phoneNumber ?? '',
             rating: profile.rating ?? 5.0,
-            vehicleType: profile.riderDetails?.vehicleType ?? '',
+            vehicleType: profile.riderDetails?.vehicleType ?? data.vehicleType ?? '',
             vehicleModel: profile.riderDetails?.vehicleModel ?? '',
             vehiclePlate: profile.riderDetails?.vehiclePlate ?? '',
-            latitude: data.l?.lat ?? 0,
-            longitude: data.l?.lng ?? 0,
+            latitude: data.location?.lat ?? 0,
+            longitude: data.location?.lng ?? 0,
             heading: data.heading ?? 0,
             speed: data.speed ?? 0,
+            status: data.status ?? 'available',
             lastUpdated: data.lastUpdated,
           });
         }
@@ -176,7 +190,15 @@ export const AdminLiveMap: React.FC = () => {
               <Marker
                 key={d.uid}
                 position={{ lat: d.latitude, lng: d.longitude }}
-                label={{ text: cfg.emoji, fontSize: '20px' }}
+                icon={
+                  window.google
+                    ? {
+                        url: createMarkerIcon(cfg.emoji, d.status),
+                        scaledSize: new window.google.maps.Size(42, 42),
+                        anchor: new window.google.maps.Point(21, 21),
+                      }
+                    : undefined
+                }
                 onClick={() => setSelected(d)}
               />
             );
@@ -201,6 +223,12 @@ export const AdminLiveMap: React.FC = () => {
                 </div>
                 <hr style={{ margin: '6px 0', borderColor: '#e2e8f0' }} />
                 <div style={{ fontSize: 12, color: '#475569' }}>
+                  <p style={{ margin: '2px 0' }}>
+                    <strong>Status: </strong>
+                    <span style={{ color: selected.status === 'available' ? '#10B981' : '#F59E0B', textTransform: 'capitalize' }}>
+                      {selected.status.replace('_', ' ')}
+                    </span>
+                  </p>
                   <p style={{ margin: '2px 0' }}>
                     {(VEHICLE_CONFIG[selected.vehicleType] ?? { emoji: '🚗' }).emoji}{' '}
                     {selected.vehicleModel || '—'} · <strong>{selected.vehiclePlate || '—'}</strong>

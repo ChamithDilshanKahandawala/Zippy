@@ -1,81 +1,62 @@
-# Requirement Document: Ride Matching & Driver Acceptance Flow (Zippy)
+# 📋 Project Zippy: Ride Completion, Payments & Notifications (v1.3)
 
-## 1. Project Overview
+## 1. Feature Overview
 
-**Project Name:** Zippy (Ride-Sharing Application)  
-**Core Functionality:** To facilitate a real-time connection between a passenger requesting a ride and a nearby online driver. This module is the engine of the application, ensuring ride requests are dispatched, accepted, and tracked through completion.
-
----
-
-## 2. Business Requirements (BR)
-
-### BR-1: Matching Logic
-
-- The system shall identify "Online" and "Available" drivers within a specific radius (e.g., 5-10km) of the passenger’s pickup location.
-- Prioritization should be based on proximity (closest driver first) to reduce wait times.
-
-### BR-2: Driver Response Window
-
-- Drivers must receive a notification and have a limited time (e.g., 30 seconds) to **Accept** or **Decline** the request before it is passed to the next available driver.
-
-### BR-3: Real-Time Transparency
-
-- Both passengers and drivers must see real-time status updates (Requesting -> Driver Found -> En Route -> Arrived).
-
-### BR-4: Reliability & Consistency
-
-- The system must prevent "Double Booking" (ensure a driver cannot accept two rides simultaneously).
+This module completes the ride lifecycle by handling automated fare deduction from the wallet, dual-rating systems, trip documentation, and real-time alert synchronization across all platforms.
 
 ---
 
-## 3. Technical Requirements (TR)
+## 2. Business Requirements
 
-### TR-1: Tech Stack & Services
+### A. Automated Payment & Wallet Deduction
 
-- **Frontend:** React Native (Expo)
-- **Database:** Firebase Firestore (Real-time listeners)
-- **Cloud Messaging:** Firebase Cloud Messaging (FCM) for push notifications.
-- **Maps:** Google Maps Platform (Distance Matrix API for ETA/Distance calculation).
-- **Backend:** Node.js/Express (running on Cloud Functions or a dedicated server) to handle heavy matching logic.
+1. **Fare Calculation:** Upon ride completion, the system must calculate the final fare based on the vehicle category and total distance traveled.
+2. **Auto-Deduction:** The final fare must be automatically deducted from the Passenger's `walletBalance`.
+3. **Transaction Integrity:** If the wallet balance is insufficient, the system should flag the ride as "Payment Pending" and notify the Passenger to top-up or pay cash.
 
-### TR-2: Ride State Machine (Status Flow)
+### B. Rating & Feedback System
 
-The ride document in Firestore must transition through these exact states:
+1. **Mutual Rating:** Both Passenger and Rider must be able to rate each other (1-5 stars) after the ride ends.
+2. **Impact:** Ratings must update the `averageRating` field in the respective user's Firestore profile.
 
-1. `PENDING`: Created by passenger, looking for driver.
-2. `SEARCHING`: Backend is actively pinging nearby drivers.
-3. `ACCEPTED`: Driver clicked accept; ride is locked.
-4. `ARRIVED`: Driver reached pickup point.
-5. `IN_PROGRESS`: Trip has started.
-6. `COMPLETED`: Trip finished and paid.
-7. `CANCELLED`: Either party cancelled before start.
+### C. Ride Documentation (Receipts)
 
-### TR-3: Backend Ride Matching Logic
+1. **Trip History:** A detailed receipt must be generated for both parties showing:
+   - Pickup/Drop-off points.
+   - Fare breakdown.
+   - Date and Duration.
 
-- **Trigger:** Firestore `onCreate` trigger on the `rides` collection.
-- **Geo-querying:** Use Geohashes or Firestore's `geo-query` capabilities to filter drivers by `currentLocation` (lat/lng).
-- **Dispatch Queue:** A background worker to manage sending notifications sequentially or in batches to avoid overwhelming the system.
+### D. Real-time Notifications (The Glue)
 
-### TR-4: Push Notifications
-
-- Implement high-priority FCM data messages to wake up the driver app even if it's in the background.
-- The notification payload must include: `rideId`, `pickupLocation`, `destination`, and `estimatedEarning`.
+1. **Ride Status Alerts:**
+   - **Accepted:** Notify Passenger when a Rider accepts the request.
+   - **Arrival:** Notify Passenger when the Rider is at the pickup location.
+   - **Start/End:** Notify both parties when the trip officially starts/ends.
+2. **Administrative Alerts:** Notify Rider immediately when their account is Approved or Rejected by the Admin.
 
 ---
 
-## 4. Files to Build / Modify
+## 3. Technical Requirements
 
-| File / Module                            | Responsibility                                                                      |
-| :--------------------------------------- | :---------------------------------------------------------------------------------- |
-| `backend/functions/matchingEngine.js`    | Logic to query Firestore for nearby drivers and trigger FCM.                        |
-| `backend/models/rideSchema.js`           | Definition of the ride object (PassengerID, DriverID, Status, Route).               |
-| `driver-app/screens/RideRequestModal.js` | The UI that pops up when a driver receives a notification (Accept/Decline buttons). |
-| `passenger-app/hooks/useRideStatus.js`   | Real-time listener to update the passenger's UI as the driver accepts.              |
-| `shared/utils/statusConstants.js`        | A central file to manage the Ride Status State Machine constants.                   |
+### A. Backend Logic (Firebase Cloud Functions)
 
----
+1. **`processPayment` Function:** - Triggered when `rides/{rideId}/status` changes to `COMPLETED`.
+   - Securely deducts amount from `users/{passengerId}/walletBalance`.
+   - Updates `users/{riderId}/earnings`.
+2. **`sendPushNotification` Service:** - A reusable service in `notificationService.ts` that uses `expo-server-sdk`.
+   - Must be called from the ride state machine logic.
 
-## 5. Success Metrics
+### B. Firestore Schema Updates
 
-- **Matching Latency:** The time from "Request" to "Driver Notified" should be < 3 seconds.
-- **Success Rate:** Percentage of ride requests that result in an `ACCEPTED` status.
+**Collection: `rides/{rideId}` (Updated)**
+
+```json
+{
+  "status": "COMPLETED | CANCELLED",
+  "fare": "number",
+  "paymentStatus": "PAID | PENDING",
+  "ratingByPassenger": "number",
+  "ratingByRider": "number",
+  "completedAt": "serverTimestamp"
+}
+```

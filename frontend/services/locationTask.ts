@@ -10,27 +10,37 @@ export const LOCATION_TASK_NAME = 'background-location-task';
 // In-memory state accessible from the background task
 let activeDriverUid: string | null = null;
 let activeTripId: string | null = null;
+let currentVehicleType: string = 'tuk'; // default if unknown
+let currentStatus: 'available' | 'busy' = 'available';
 let foregroundWatcher: Location.LocationSubscription | null = null;
 
-export const setActiveTripId = (id: string | null) => { activeTripId = id; };
+export const setActiveTripId = (id: string | null) => { 
+  activeTripId = id; 
+  currentStatus = id ? 'busy' : 'available';
+};
 export const setActiveDriverUid = (uid: string | null) => { activeDriverUid = uid; };
 
 // ── Shared location handler (used by both background task and foreground watcher) ──
 async function handleNewLocation(latitude: number, longitude: number, heading: number, speed: number) {
-  // 1. Write to active_drivers (geohashed)
+  // 1. Write to active_riders (geohashed)
   if (activeDriverUid) {
     try {
       const hash = geohashForLocation([latitude, longitude]);
-      await setDoc(doc(db, 'active_drivers', activeDriverUid), {
+      await setDoc(doc(db, 'active_riders', activeDriverUid), {
         uid: activeDriverUid,
-        l: { lat: latitude, lng: longitude },
-        g: hash,
+        location: {
+          lat: latitude,
+          lng: longitude,
+          geohash: hash,
+        },
         heading: heading ?? 0,
         speed: speed ?? 0,
+        vehicleType: currentVehicleType,
+        status: currentStatus,
         lastUpdated: serverTimestamp(),
       });
     } catch (e) {
-      console.error('❌ Firestore active_drivers write error:', e);
+      console.error('❌ Firestore active_riders write error:', e);
     }
   }
 
@@ -104,8 +114,9 @@ function stopForegroundWatcher() {
  * Tries background first (physical device). If bg permissions denied
  * (simulator), falls back to foreground-only watcher.
  */
-export const startLocationTracking = async (driverUid: string) => {
+export const startLocationTracking = async (driverUid: string, vehicleType: string = 'tuk') => {
   setActiveDriverUid(driverUid);
+  currentVehicleType = vehicleType;
 
   // Always need foreground permission
   const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
@@ -167,13 +178,13 @@ export const stopLocationTracking = async () => {
     console.log('🛑 Background location tracking stopped');
   }
 
-  // Remove driver from active_drivers collection
+  // Remove driver from active_riders collection
   if (uid) {
     try {
-      await deleteDoc(doc(db, 'active_drivers', uid));
-      console.log('🗑️ Removed from active_drivers');
+      await deleteDoc(doc(db, 'active_riders', uid));
+      console.log('🗑️ Removed from active_riders');
     } catch (e) {
-      console.error('❌ Failed to remove active_drivers doc:', e);
+      console.error('❌ Failed to remove active_riders doc:', e);
     }
   }
 

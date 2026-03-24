@@ -1,5 +1,5 @@
 // The status of a ride
-export type RideStatus = 'PENDING' | 'ACCEPTED' | 'STARTED' | 'COMPLETED' | 'CANCELLED';
+export type RideStatus = 'PENDING' | 'SEARCHING' | 'ACCEPTED' | 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
 // GeoPoint is the native Firestore type, but using a JS object for consistency:
 export interface LocationData {
@@ -33,6 +33,9 @@ export interface Ride {
   rideType: string;
   estimatedFare: number;
   finalFare?: number; // Calculated at end of trip
+  paymentStatus?: 'PAID' | 'PENDING';
+  ratingByPassenger?: number;
+  ratingByRider?: number;
   
   // Driver assignment
   driverId?: string;

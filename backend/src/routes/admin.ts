@@ -5,6 +5,7 @@ import {
   getPendingDrivers,
   approveDriver,
   rejectDriver,
+  notifyDriver,
 } from '../controllers/adminController';
 import { verifyIdToken, verifyRole } from '../middleware/auth';
 
@@ -37,5 +38,10 @@ router.post('/drivers/:driverId/approve', approveDriver);
  * @route  POST /api/admin/drivers/:driverId/reject
  */
 router.post('/drivers/:driverId/reject', rejectDriver);
+
+/**
+ * @route  POST /api/admin/drivers/:driverId/notify
+ */
+router.post('/drivers/:driverId/notify', notifyDriver);
 
 export default router;

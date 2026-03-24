@@ -192,6 +192,9 @@ export const completeRide: RequestHandler = async (req, res, next) => {
       const currentBalance = passengerData?.walletBalance ?? 0;
       const fare = finalFare ?? rideData?.estimatedFare ?? 0;
 
+      // 📝 New: Audit Trail Reference
+      const transactionRef = db.collection('transactions').doc();
+
       // Handle wallet deduction
       if (currentBalance >= fare) {
         transaction.update(passengerRef, {
@@ -202,15 +205,37 @@ export const completeRide: RequestHandler = async (req, res, next) => {
         const driverRef = db.collection('users').doc(driverId);
         transaction.update(driverRef, {
           walletBalance: FieldValue.increment(fare),
-          lifetimeEarnings: FieldValue.increment(fare)
+          'riderDetails.totalEarnings': FieldValue.increment(fare)
+        });
+
+        // 📝 Log Successful Transaction
+        transaction.set(transactionRef, {
+          rideId,
+          type: 'RIDE_PAYMENT',
+          amount: fare,
+          passengerId,
+          driverId,
+          status: 'SUCCESS',
+          createdAt: FieldValue.serverTimestamp()
         });
       } else {
         paymentStatus = 'PENDING'; // Not enough balance, must pay cash or top-up
+        
+        // 📝 Log Failed/Pending Transaction
+        transaction.set(transactionRef, {
+          rideId,
+          type: 'RIDE_PAYMENT',
+          amount: fare,
+          passengerId,
+          driverId,
+          status: 'INSUFFICIENT_BALANCE',
+          createdAt: FieldValue.serverTimestamp()
+        });
       }
 
       transaction.update(rideRef, {
         status: 'COMPLETED',
-        completedAt: new Date(),
+        completedAt: FieldValue.serverTimestamp(),
         fare: fare,
         paymentStatus
       });
